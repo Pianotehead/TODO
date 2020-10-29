@@ -15,7 +15,7 @@ namespace TODO
 
         static void Main(string[] args)
         {
-            Menu mainMenu = new Menu(new string[] { "Add task", "Exit" });
+            Menu mainMenu = new Menu(new string[] { "Add task", "List tasks", "Exit" });
             ConsoleKey input;
             bool applicationRunning = true;
             do
@@ -25,7 +25,8 @@ namespace TODO
                 input = Menu.ActOnOnlyTheseKeys
                 (
                     ConsoleKey.D1, ConsoleKey.NumPad1,
-                    ConsoleKey.D2, ConsoleKey.NumPad2
+                    ConsoleKey.D2, ConsoleKey.NumPad2,
+                    ConsoleKey.D3, ConsoleKey.NumPad3
                 );
                 Console.Clear();
                 switch (input)
@@ -33,11 +34,16 @@ namespace TODO
                     case ConsoleKey.D1:
                     case ConsoleKey.NumPad1:
                         AddTask();
-                        WriteLine("\n  Task registered");
-                        Thread.Sleep(2000);
                         break;
                     case ConsoleKey.D2:
                     case ConsoleKey.NumPad2:
+                        ListTasks();
+                        ConsoleKey deleteOrNot = Menu.ActOnOnlyTheseKeys(ConsoleKey.D, ConsoleKey.Escape);
+                        // Delete will be implemented later
+                        // Database interaction is next!
+                        break;
+                    case ConsoleKey.D3:
+                    case ConsoleKey.NumPad3:
                         applicationRunning = false;
                         break;
                 }
@@ -56,6 +62,16 @@ namespace TODO
             DateTime dateInput = ConvertSuccessfullyToDate(inputsForTask[1]);
             MyTask newTask = new MyTask(inputsForTask[0], dateInput);
             myTaskList.Add(newTask);
+            WriteLine("\n  Task registered");
+            Thread.Sleep(2000);
+        }
+
+        private static void ListTasks()
+        {
+            int[] columnWidths = { 50, 20 };
+            string[] headers = new string[] { "Description", "Due date"};
+            Menu.CreateTableWithHeaders(myTaskList, headers, columnWidths);
+            WriteLine("\n\n  [D] Delete | [Esc] Back to main menu");
         }
 
         public static DateTime ConvertSuccessfullyToDate(string dateAsText)
