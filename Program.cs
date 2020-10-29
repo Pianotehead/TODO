@@ -11,6 +11,7 @@ namespace TODO
 {
     class Program
     {
+        static string connectionString = "Server=localhost;Database=TODO;Integrated Security=True";
         public static List<MyTask> myTaskList = new List<MyTask>();
 
         static void Main(string[] args)
@@ -28,7 +29,7 @@ namespace TODO
                     ConsoleKey.D2, ConsoleKey.NumPad2,
                     ConsoleKey.D3, ConsoleKey.NumPad3
                 );
-                Console.Clear();
+                Clear();
                 switch (input)
                 {
                     case ConsoleKey.D1:
@@ -37,10 +38,9 @@ namespace TODO
                         break;
                     case ConsoleKey.D2:
                     case ConsoleKey.NumPad2:
-                        ListTasks();
+                        int[] columnWidths = { 50, 20 };
+                        MyTask.ListTasks(myTaskList, columnWidths);
                         ConsoleKey deleteOrNot = Menu.ActOnOnlyTheseKeys(ConsoleKey.D, ConsoleKey.Escape);
-                        // Delete will be implemented later
-                        // Database interaction is next!
                         break;
                     case ConsoleKey.D3:
                     case ConsoleKey.NumPad3:
@@ -59,20 +59,57 @@ namespace TODO
             Clear();
             Menu askForData = new Menu(new string[] { "Task", "Due Date (YYYY-MM-DD)" });
             string[] inputsForTask = askForData.AskForInputs();
-            DateTime dateInput = ConvertSuccessfullyToDate(inputsForTask[1]);
-            MyTask newTask = new MyTask(inputsForTask[0], dateInput);
+            MyTask newTask;
+            DateTime dateInput;
+            if (!string.IsNullOrWhiteSpace(inputsForTask[1]))
+            {
+                dateInput = ConvertSuccessfullyToDate(inputsForTask[1]);
+                newTask = new MyTask(inputsForTask[0], dateInput);
+            }
+            else
+            {
+                newTask = new MyTask(inputsForTask[0]);
+            }
             myTaskList.Add(newTask);
+            InsertMyTask(newTask);
             WriteLine("\n  Task registered");
             Thread.Sleep(2000);
         }
 
-        private static void ListTasks()
+        private static void InsertMyTask(MyTask myTask)
         {
-            int[] columnWidths = { 50, 20 };
-            string[] headers = new string[] { "Description", "Due date"};
-            Menu.CreateTableWithHeaders(myTaskList, headers, columnWidths);
-            WriteLine("\n\n  [D] Delete | [Esc] Back to main menu");
-        }
+            SqlConnection connection = new SqlConnection(connectionString);
+            SqlCommand command;
+            if (!(myTask.DueDate == null))
+            {
+                var sql = $@"
+                INSERT INTO MyTask (Name, DueDate)
+                VALUES (@Name, @DueDate)";
+
+                command = new SqlCommand(sql, connection);
+
+                command.Parameters.AddWithValue("@Name", myTask.Name);
+
+                command.Parameters.AddWithValue("@DueDate", myTask.DueDate);
+
+            }
+            else
+            {
+                var sql = $@"
+                INSERT INTO MyTask (Name)
+                VALUES (@Name)";
+
+                command = new SqlCommand(sql, connection);
+
+                command.Parameters.AddWithValue("@Name", myTask.Name);
+
+            }
+
+
+            connection.Open();
+            command.ExecuteNonQuery();
+            connection.Close();
+        }  
 
         public static DateTime ConvertSuccessfullyToDate(string dateAsText)
         {
@@ -85,7 +122,7 @@ namespace TODO
                 {
                     Clear();
                     WriteLine("\n Input must be in the format YYYY-MM-DD");
-                    Write(" Also note dates in the past are not allowed. Please try again. ");
+                    Write(" Please try again. ");
                     dateAsText = ReadLine();
                 }
 
