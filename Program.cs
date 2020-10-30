@@ -41,16 +41,24 @@ namespace TODO
                     case ConsoleKey.NumPad2:
                         var myTaskList = FetchMyTasks();
                         MyTask.ListTasks(myTaskList, columnWidths, false);
-                        ConsoleKey deleteOrNot = Menu.ActOnOnlyTheseKeys(ConsoleKey.D, ConsoleKey.Escape);
-                        switch (deleteOrNot)
+                        ConsoleKey deleteOrComplete = Menu.ActOnOnlyTheseKeys(ConsoleKey.D,
+                                    ConsoleKey.C, ConsoleKey.Escape);
+                        switch (deleteOrComplete)
                         {
                             case ConsoleKey.D:
+                            case ConsoleKey.C:
                                 MyTask.ListTasks(myTaskList, columnWidths);
-                                int idToRemove = ConvertSuccessfullyToInt(ReadLine());
+                                int idToWorkWith = ConvertSuccessfullyToInt(ReadLine());
                                 CursorVisible = false;
-                                DeleteTask(idToRemove);
+                                if (deleteOrComplete == ConsoleKey.C)
+                                {
+                                    TaskCompleted(idToWorkWith);
+                                }
+                                else if (deleteOrComplete == ConsoleKey.D)
+                                {
+                                    DeleteTask(idToWorkWith);
+                                }
                                 break;
-
                         }
                         break;
                     case ConsoleKey.D3:
@@ -167,23 +175,63 @@ namespace TODO
             return myTaskList;
         }
 
-            private static void DeleteTask(int idToRemove)
+        private static void DeleteTask(int idToRemove)
+        {
+            var sql = $@"DELETE FROM MyTask WHERE Id = @Id";
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
             {
-                var sql = $@"DELETE FROM MyTask WHERE Id = @Id";
+                SqlCommand command = new SqlCommand(sql, connection);
 
-                using (SqlConnection connection = new SqlConnection(connectionString))
-                {
-                    SqlCommand command = new SqlCommand(sql, connection);
-
-                    command.Parameters.AddWithValue("@Id", idToRemove);
-                    connection.Open();
-                    command.ExecuteNonQuery();
-                    connection.Close();
-                }
-                Clear();
-                WriteLine($"\n\n  Task nr. {idToRemove} was deleted from the task list...");
-                Thread.Sleep(2000);
+                command.Parameters.AddWithValue("@Id", idToRemove);
+                connection.Open();
+                command.ExecuteNonQuery();
+                connection.Close();
             }
+            Clear();
+            WriteLine($"\n\n  Task nr. {idToRemove} was deleted from the task list...");
+            Thread.Sleep(2000);
+        }
+
+        private static void TaskCompleted(int idOfCompleted)
+        {
+            var sql = $@"UPDATE MyTask SET CompletedAt = GETDATE() WHERE Id=@Id";
+
+            string completionStatus = CheckIfTaskIsCompleted(idOfCompleted);
+
+            if (!string.IsNullOrWhiteSpace(completionStatus))
+            {
+                throw new ArgumentException("Task is already completed.", "completionStatus");
+            }
+
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+
+                SqlCommand command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@Id", idOfCompleted);
+                connection.Open();
+                command.ExecuteNonQuery();
+                connection.Close();
+            }
+            Clear();
+            WriteLine($"\n\n  Task nr. {idOfCompleted} marked as completed...");
+            Thread.Sleep(2000);
+        }
+
+        private static string CheckIfTaskIsCompleted(int idOfTask)
+        {
+            var myTaskList = FetchMyTasks();
+            string completedOrNot = "";
+            foreach (var myTask in myTaskList)
+            {
+                if (myTask.Id == idOfTask)
+                {
+                    completedOrNot = myTask.CompletedAt.ToString();
+                    break;
+                }
+            }
+            return completedOrNot;
+        }
 
         public static DateTime ConvertSuccessfullyToDate(string dateAsText)
         {
