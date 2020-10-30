@@ -133,7 +133,7 @@ namespace TODO
                     string completionDate = reader["CompletedAt"].ToString();
                     if (string.IsNullOrWhiteSpace(dueDateAsString) && string.IsNullOrWhiteSpace(completionDate))
                     {
-                        myTaskList.Add(new MyTask(id, name, null, null));
+                        myTaskList.Add(new MyTask(id, name, null));
                     }
                     else if (string.IsNullOrWhiteSpace(dueDateAsString) && !string.IsNullOrWhiteSpace(completionDate))
                     {
@@ -143,7 +143,7 @@ namespace TODO
                     else if (!string.IsNullOrWhiteSpace(dueDateAsString) && string.IsNullOrWhiteSpace(completionDate))
                     {
                         var dueDate = (DateTime)reader["DueDate"];
-                        myTaskList.Add(new MyTask(id, name, dueDate, null));
+                        myTaskList.Add(new MyTask(id, name, dueDate));
                     }
                     else
                     {
