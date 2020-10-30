@@ -23,6 +23,7 @@ namespace TODO
             {
                 mainMenu.CreateNumberedMenu();
                 CursorVisible = false;
+                int[] columnWidths = { 4, 50, 20, 20 };
                 input = Menu.ActOnOnlyTheseKeys
                 (
                     ConsoleKey.D1, ConsoleKey.NumPad1,
@@ -38,10 +39,19 @@ namespace TODO
                         break;
                     case ConsoleKey.D2:
                     case ConsoleKey.NumPad2:
-                        int[] columnWidths = { 4, 50, 20, 20 };
                         var myTaskList = FetchMyTasks();
-                        MyTask.ListTasks(myTaskList, columnWidths);
+                        MyTask.ListTasks(myTaskList, columnWidths, false);
                         ConsoleKey deleteOrNot = Menu.ActOnOnlyTheseKeys(ConsoleKey.D, ConsoleKey.Escape);
+                        switch (deleteOrNot)
+                        {
+                            case ConsoleKey.D:
+                                MyTask.ListTasks(myTaskList, columnWidths);
+                                int idToRemove = ConvertSuccessfullyToInt(ReadLine());
+                                CursorVisible = false;
+                                DeleteTask(idToRemove);
+                                break;
+
+                        }
                         break;
                     case ConsoleKey.D3:
                     case ConsoleKey.NumPad3:
@@ -157,34 +167,23 @@ namespace TODO
             return myTaskList;
         }
 
-        private static void ListTasks()
-        {
-            var myTaskList = FetchMyTasks();
-
-            Console.WriteLine($"{"Name",-50}Due Date");
-            Console.WriteLine("============================================================");
-
-            foreach (var myTask in myTaskList)
+            private static void DeleteTask(int idToRemove)
             {
-                Console.WriteLine($"{myTask.Name,-50}{(myTask.DueDate.HasValue ? myTask.DueDate.Value.ToString() : "")}");
+                var sql = $@"DELETE FROM MyTask WHERE Id = @Id";
+
+                using (SqlConnection connection = new SqlConnection(connectionString))
+                {
+                    SqlCommand command = new SqlCommand(sql, connection);
+
+                    command.Parameters.AddWithValue("@Id", idToRemove);
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                    connection.Close();
+                }
+                Clear();
+                WriteLine($"\n\n  Task nr. {idToRemove} was deleted from the task list...");
+                Thread.Sleep(2000);
             }
-
-            Console.CursorTop++;
-            Console.WriteLine("[D] Delete | [Esc] Return");
-            ConsoleKeyInfo input;
-
-            while (
-                (input = Console.ReadKey(true)).Key != ConsoleKey.D &&
-                input.Key != ConsoleKey.Escape)
-            { }
-
-            // if (input.Key == ConsoleKey.D)
-            // {
-            //     RemoveTask(myTaskList);
-            // }
-            Console.Clear();
-        }
-
 
         public static DateTime ConvertSuccessfullyToDate(string dateAsText)
         {
@@ -204,6 +203,26 @@ namespace TODO
 
             } while (!conversionSuccessful);
             return dateInCorrectFormat;
+        }
+
+        public static int ConvertSuccessfullyToInt(string numberAsText)
+        {
+            bool conversionSuccessful;
+            int result;
+            do
+            {
+                conversionSuccessful = Int32.TryParse(numberAsText, out result);
+                if (!conversionSuccessful ||(conversionSuccessful && result == 0))
+                {
+                    Clear();
+                    WriteLine("\n Input must be a positive integer, greater than zero.");
+                    Write(" Please try again. ");
+                    numberAsText = ReadLine();
+                }
+                
+
+            } while (!conversionSuccessful);
+            return result;
         }
     }
 }
