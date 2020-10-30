@@ -71,7 +71,6 @@ namespace TODO
             {
                 newTask = new MyTask(inputsForTask[0]);
             }
-            myTaskList.Add(newTask);
             InsertMyTask(newTask);
             WriteLine("\n  Task registered");
             Thread.Sleep(2000);
