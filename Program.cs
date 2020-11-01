@@ -12,7 +12,6 @@ namespace TODO
     class Program
     {
         static string connectionString = "Server=localhost;Database=TODO;Integrated Security=True";
-        public static List<MyTask> myTaskList = new List<MyTask>();
 
         static void Main(string[] args)
         {
@@ -28,7 +27,8 @@ namespace TODO
                 (
                     ConsoleKey.D1, ConsoleKey.NumPad1,
                     ConsoleKey.D2, ConsoleKey.NumPad2,
-                    ConsoleKey.D3, ConsoleKey.NumPad3
+                    ConsoleKey.D3, ConsoleKey.NumPad3,
+                    ConsoleKey.D4, ConsoleKey.NumPad4
                 );
                 Clear();
                 switch (input)
@@ -37,17 +37,20 @@ namespace TODO
                     case ConsoleKey.NumPad1:
                         AddTask();
                         break;
+
                     case ConsoleKey.D2:
                     case ConsoleKey.NumPad2:
                         var myTaskList = FetchMyTasks();
-                        MyTask.ListTasks(myTaskList, columnWidths, false);
-                        ConsoleKey deleteOrComplete = Menu.ActOnOnlyTheseKeys(ConsoleKey.D,
-                                    ConsoleKey.C, ConsoleKey.Escape);
+                        TableMaker taskTable = new TableMaker(myTaskList);
+                        taskTable.CreateTable(false); //Write table without Id
+
+                        //ConsoleKey deleteOrComplete = Menu.ActOnOnlyTheseKeys(ConsoleKey.C, ConsoleKey.D);
+                        ConsoleKey deleteOrComplete = ReadKey(true).Key;
                         switch (deleteOrComplete)
                         {
                             case ConsoleKey.D:
                             case ConsoleKey.C:
-                                MyTask.ListTasks(myTaskList, columnWidths);
+                                taskTable.CreateTable();
                                 int idToWorkWith = ConvertSuccessfullyToInt(ReadLine());
                                 CursorVisible = false;
                                 if (deleteOrComplete == ConsoleKey.C)
@@ -61,12 +64,14 @@ namespace TODO
                                 break;
                         }
                         break;
+
                     case ConsoleKey.D3:
                     case ConsoleKey.NumPad3:
                         applicationRunning = false;
                         break;
                 }
             } while (applicationRunning);
+
             Clear();
             WriteLine("\n  Thank you for using this To Do application");
             Thread.Sleep(2000);
@@ -80,6 +85,7 @@ namespace TODO
             string[] inputsForTask = askForData.AskForInputs();
             MyTask newTask;
             DateTime dateInput;
+
             if (!string.IsNullOrWhiteSpace(inputsForTask[1]))
             {
                 dateInput = ConvertSuccessfullyToDate(inputsForTask[1]);
@@ -100,29 +106,21 @@ namespace TODO
             SqlCommand command;
             if (!(myTask.DueDate == null))
             {
-                var sql = $@"
-                INSERT INTO MyTask (Name, DueDate)
+                var sql = $@"INSERT INTO MyTask (Name, DueDate)
                 VALUES (@Name, @DueDate)";
 
                 command = new SqlCommand(sql, connection);
-
                 command.Parameters.AddWithValue("@Name", myTask.Name);
-
                 command.Parameters.AddWithValue("@DueDate", myTask.DueDate);
-
             }
             else
             {
-                var sql = $@"
-                INSERT INTO MyTask (Name)
+                var sql = $@"INSERT INTO MyTask (Name)
                 VALUES (@Name)";
 
                 command = new SqlCommand(sql, connection);
-
                 command.Parameters.AddWithValue("@Name", myTask.Name);
-
             }
-
 
             connection.Open();
             command.ExecuteNonQuery();
@@ -132,14 +130,12 @@ namespace TODO
         private static IList<MyTask> FetchMyTasks()
         {
             string sql = "SELECT Id, Name, DueDate, CompletedAt FROM MyTask";
-
             List<MyTask> myTaskList = new List<MyTask>();
 
             using (SqlConnection connection = new SqlConnection(connectionString))
             using (SqlCommand command = new SqlCommand(sql, connection))
             {
                 connection.Open();
-
                 SqlDataReader reader = command.ExecuteReader();
 
                 while (reader.Read())
@@ -148,6 +144,7 @@ namespace TODO
                     var name = (string)reader["Name"];
                     string dueDateAsString = reader["DueDate"].ToString();
                     string completionDate = reader["CompletedAt"].ToString();
+
                     if (string.IsNullOrWhiteSpace(dueDateAsString) && string.IsNullOrWhiteSpace(completionDate))
                     {
                         myTaskList.Add(new MyTask(id, name, null));
@@ -169,10 +166,26 @@ namespace TODO
                         myTaskList.Add(new MyTask(id, name, dueDate, completedAt));
                     }
                 }
-
                 connection.Close();
             }
             return myTaskList;
+        }
+
+        private static string FetchTaskCompletionStatusById(int taskId)
+        {
+            string sql = "SELECT CompletedAt FROM MyTask WHERE Id = @Id";
+            string completionDate;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            using (SqlCommand command = new SqlCommand(sql, connection))
+            {
+                command.Parameters.AddWithValue("@Id", taskId);
+                connection.Open();
+                SqlDataReader reader = command.ExecuteReader();
+                reader.Read();
+                completionDate = reader["CompletedAt"].ToString();
+                connection.Close();
+            }
+            return completionDate;
         }
 
         private static void DeleteTask(int idToRemove)
@@ -196,9 +209,8 @@ namespace TODO
         private static void TaskCompleted(int idOfCompleted)
         {
             var sql = $@"UPDATE MyTask SET CompletedAt = GETDATE() WHERE Id=@Id";
-
-            string completionStatus = CheckIfTaskIsCompleted(idOfCompleted);
-
+            string completionStatus = FetchTaskCompletionStatusById(idOfCompleted);
+            WriteLine($"completionStatus={completionStatus}END");
             if (!string.IsNullOrWhiteSpace(completionStatus))
             {
                 throw new ArgumentException("Task is already completed.", "completionStatus");
@@ -216,21 +228,6 @@ namespace TODO
             Clear();
             WriteLine($"\n\n  Task nr. {idOfCompleted} marked as completed...");
             Thread.Sleep(2000);
-        }
-
-        private static string CheckIfTaskIsCompleted(int idOfTask)
-        {
-            var myTaskList = FetchMyTasks();
-            string completedOrNot = "";
-            foreach (var myTask in myTaskList)
-            {
-                if (myTask.Id == idOfTask)
-                {
-                    completedOrNot = myTask.CompletedAt.ToString();
-                    break;
-                }
-            }
-            return completedOrNot;
         }
 
         public static DateTime ConvertSuccessfullyToDate(string dateAsText)
@@ -260,14 +257,14 @@ namespace TODO
             do
             {
                 conversionSuccessful = Int32.TryParse(numberAsText, out result);
-                if (!conversionSuccessful ||(conversionSuccessful && result == 0))
+                if (!conversionSuccessful || (conversionSuccessful && result == 0))
                 {
                     Clear();
                     WriteLine("\n Input must be a positive integer, greater than zero.");
                     Write(" Please try again. ");
                     numberAsText = ReadLine();
                 }
-                
+
 
             } while (!conversionSuccessful);
             return result;
